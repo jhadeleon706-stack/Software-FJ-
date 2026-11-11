@@ -1,0 +1,15 @@
+2026-11-10 17:53:05,333 | INFO | Cliente registrado: 1012345678
+2026-11-10 17:53:05,333 | INFO | Intento de registro finalizado (doc. 1012345678)
+2026-11-10 17:53:05,333 | INFO | Cliente registrado: 80123456
+2026-11-10 17:53:05,333 | INFO | Intento de registro finalizado (doc. 80123456)
+2026-11-10 17:53:05,334 | ERROR | Registro fallido: Ya existe el documento 1012345678
+2026-11-10 17:53:05,334 | INFO | Intento de registro finalizado (doc. 1012345678)
+2026-11-10 17:53:05,334 | ERROR | Registro fallido: Correo con formato inválido: ana-correo.com
+2026-11-10 17:53:05,334 | INFO | Intento de registro finalizado (doc. 52111222)
+2026-11-10 17:53:05,334 | ERROR | Registro fallido: Falta el dato obligatorio: nombre
+2026-11-10 17:53:05,334 | INFO | Intento de registro finalizado (doc. 52333444)
+2026-11-10 17:53:05,334 | ERROR | Registro fallido: El celular debe tener 10 dígitos y empezar por 3
+2026-11-10 17:53:05,334 | INFO | Intento de registro finalizado (doc. 52555666)
+2026-11-10 17:53:05,335 | ERROR | Registro fallido: El documento debe tener entre 6 y 10 dígitos
+2026-11-10 17:53:05,335 | INFO | Intento de registro finalizado (doc. ABC123)
+2026-11-10 17:53:05,335 | ERROR | Búsqueda fallida: No existe el cliente con documento 99999999
