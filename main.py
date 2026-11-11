@@ -1,30 +1,23 @@
-from clientes import Cliente
+from clientes import GestorClientes, DatoInvalidoError, ClienteNoEncontradoError
 from servicios import ReservaSala, AlquilerEquipo, AsesoriaEspecializada
 from reservas import Reserva
-from excepciones_y_logs import LoggerSistema, ErrorClienteInvalido, ErrorServicioNoDisponible, ErrorReserva
 
 def ejecutar_simulacion():
     print("=" * 70)
     print(" INICIANDO SIMULACIÓN DE 10 OPERACIONES - SOFTWARE FJ (FASE 4) ")
     print("=" * 70)
     
-    # Lista para almacenar las reservas exitosas y de prueba
+    # Inicializamos el gestor de clientes de tu compañero
+    gestor_clientes = GestorClientes()
     historial_reservas = []
     
     # --- OPERACIÓN 1: Registro correcto de un cliente ---
     print("\n[Operación 1] Intentando registrar un cliente VÁLIDO...")
-    try:
-        cliente1 = Cliente("1020304050", "Laura Gómez", "laura.gomez@unad.edu.co", "3104567890")
-        print("-> Éxito: Cliente creado correctamente.")
-    except Exception as e:
-        print(f"-> Error capturado: {e}")
+    cliente1 = gestor_clientes.registrar("Laura Gómez", "1012345678", "laura@correo.com", "3001234567")
 
-    # --- OPERACIÓN 2: Registro incorrecto de un cliente (Cédula inválida) ---
-    print("\n[Operación 2] Intentando registrar un cliente INVÁLIDO (cédula con letras)...")
-    try:
-        cliente_malo = Cliente("ABC12345", "Carlos Pérez", "carlos@mail.com", "3201234567")
-    except ErrorClienteInvalido as e:
-        print(f"-> Excepción controlada correctamente: {e}")
+    # --- OPERACIÓN 2: Registro incorrecto de un cliente (Documento corto / inválido) ---
+    print("\n[Operación 2] Intentando registrar un cliente con documento INVÁLIDO...")
+    gestor_clientes.registrar("Carlos Pérez", "12345", "carlos@correo.com", "3109876543")
 
     # --- OPERACIÓN 3: Creación correcta de un servicio de Sala ---
     print("\n[Operación 3] Creando servicio de Reservas de Salas...")
@@ -38,7 +31,7 @@ def ejecutar_simulacion():
     print("\n[Operación 4] Intentando crear servicio con tarifa INVÁLIDA (-100)...")
     try:
         sala_error = ReservaSala("S002", "Sala Rota", -100.0, 5)
-    except ErrorServicioNoDisponible as e:
+    except Exception as e:
         print(f"-> Excepción controlada correctamente: {e}")
 
     # --- OPERACIÓN 5: Creación correcta de Alquiler de Equipo y Asesoría ---
@@ -51,50 +44,59 @@ def ejecutar_simulacion():
     except Exception as e:
         print(f"-> Error: {e}")
 
-    # --- OPERACIÓN 6: Reserva EXITOSA de una Sala (Aplicando polimorfismo y descuento) ---
+    # --- OPERACIÓN 6: Reserva EXITOSA de una Sala (Polimorfismo y descuento) ---
     print("\n[Operación 6] Procesando reserva EXITOSA de Sala (4 horas, 10% descuento)...")
-    try:
-        reserva1 = Reserva(cliente1, sala_reuniones, cantidad_unidad=4, tipo_parametro=10.0)
-        historial_reservas.append(reserva1)
-        print(f"-> Detalle: {reserva1.obtener_reserva_detalles()}")
-    except Exception as e:
-        print(f"-> Error: {e}")
+    if cliente1:
+        try:
+            reserva1 = Reserva(cliente1, sala_reuniones, cantidad_unidad=4, tipo_parametro=10.0)
+            historial_reservas.append(reserva1)
+            print(f"-> Detalle: {reserva1.obtener_reserva_detalles()}")
+        except Exception as e:
+            print(f"-> Error: {e}")
 
     # --- OPERACIÓN 7: Reserva EXITOSA de Alquiler de Equipos (3 días con seguro) ---
     print("\n[Operación 7] Procesando reserva EXITOSA de Equipo (3 días, $20000 seguro)...")
-    try:
-        reserva2 = Reserva(cliente1, equipo_camara, cantidad_unidad=3, tipo_parametro=20000.0)
-        historial_reservas.append(reserva2)
-        print(f"-> Detalle: {reserva2.obtener_reserva_detalles()}")
-    except Exception as e:
-        print(f"-> Error: {e}")
+    if cliente1:
+        try:
+            reserva2 = Reserva(cliente1, equipo_camara, cantidad_unidad=3, tipo_parametro=20000.0)
+            historial_reservas.append(reserva2)
+            print(f"-> Detalle: {reserva2.obtener_reserva_detalles()}")
+        except Exception as e:
+            print(f"-> Error: {e}")
 
-    # --- OPERACIÓN 8: Reserva FALLIDA por cantidad de horas inválida (cero o negativa) ---
+    # --- OPERACIÓN 8: Reserva FALLIDA por cantidad de horas inválida ---
     print("\n[Operación 8] Intentando procesar reserva con horas INVÁLIDAS (-2 horas)...")
-    try:
-        reserva_fallida = Reserva(cliente1, sala_reuniones, cantidad_unidad=-2, tipo_parametro=0.0)
-    except ErrorReserva as e:
-        print(f"-> Excepción controlada correctamente (La app sigue viva): {e}")
+    if cliente1:
+        try:
+            reserva_fallida = Reserva(cliente1, sala_reuniones, cantidad_unidad=-2, tipo_parametro=0.0)
+        except Exception as e:
+            print(f"-> Excepción controlada correctamente (La app sigue viva): {e}")
 
-    # --- OPERACIÓN 9: Registro y reserva con otro cliente válido ---
+    # --- OPERACIÓN 9: Registro de segundo cliente válido y creación de Asesoría ---
     print("\n[Operación 9] Registrando segundo cliente y creando Asesoría...")
-    try:
-        cliente2 = Cliente("987654321", "Andrea Ruiz", "andrea.ruiz@unad.edu.co", "3159876543")
-        reserva3 = Reserva(cliente2, asesoria_ing, cantidad_unidad=2, tipo_parametro=1.2) # factor complejidad
-        historial_reservas.append(reserva3)
-        print(f"-> Detalle: {reserva3.obtener_reserva_detalles()}")
-    except Exception as e:
-        print(f"-> Error: {e}")
+    cliente2 = gestor_clientes.registrar("Ana Ruiz", "52111222", "ana@correo.com", "3201234567")
+    if cliente2:
+        try:
+            reserva3 = Reserva(cliente2, asesoria_ing, cantidad_unidad=2, tipo_parametro=1.2)
+            historial_reservas.append(reserva3)
+            print(f"-> Detalle: {reserva3.obtener_reserva_detalles()}")
+        except Exception as e:
+            print(f"-> Error: {e}")
 
-    # --- OPERACIÓN 10: Cancelación segura de una reserva ---
-    print("\n[Operación 10] Probando la cancelación segura de una reserva existente...")
+    # --- OPERACIÓN 10: Cancelación segura de una reserva y búsqueda en gestor ---
+    print("\n[Operación 10] Probando cancelación de reserva y búsqueda de cliente...")
     if historial_reservas:
         reserva_a_cancelar = historial_reservas[0]
         reserva_a_cancelar.cancelar_reserva()
-        print(f"-> Estado actualizado: {reserva_a_cancelar.obtener_reserva_detalles()}")
+    
+    try:
+        cliente_encontrado = gestor_clientes.buscar("1012345678")
+        print(f"-> Cliente encontrado en gestor: {cliente_encontrado.describir()}")
+    except Exception as e:
+        print(f"-> Error en búsqueda: {e}")
 
     print("\n" + "=" * 70)
-    print(" ¡SIMULACIÓN FINALIZADA CON ÉXITO! REVISA EL ARCHIVO 'sistema.log' ")
+    print(" ¡SIMULACIÓN FINALIZADA CON ÉXITO! REVISA EL ARCHIVO 'logs_software_fj.log' ")
     print("=" * 70)
 
 if __name__ == "__main__":
