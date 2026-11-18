@@ -1,81 +1,135 @@
-import logging
-from clientes import DatoInvalidoError, ErrorSoftwareFJ
+"""Módulo de reservas y excepciones avanzadas - Software FJ."""
 
-logger = logging.getLogger("software_fj")
+import itertools                                    # Para generar números de reserva
+from clientes import (                       # Piezas del módulo de clientes
+    Cliente, EntidadBase, ErrorSoftwareFJ, logger,
+)
+from servicios import Servicio                 # Clase abstracta de servicios
 
-class Reserva:
-    """Clase Reserva que integra cliente, servicio, duración y estado con manejo avanzado de errores."""
-    
-    contador_ids = 1
 
-    def __init__(self, cliente, servicio, cantidad_unidad, tipo_parametro=0.0):
-        self.__id_reserva = Reserva.contador_ids
-        Reserva.contador_ids += 1
-        self.__cliente = cliente
-        self.__servicio = servicio
-        self.__cantidad_unidad = cantidad_unidad
-        self.__tipo_parametro = tipo_parametro  
-        self.__estado = "Creada"
-        self.__costo_total = 0.0
-        
-        self.procesar_reserva()
+# ------------------------------------------------- EXCEPCIONES AVANZADAS
+class ReservaInvalidaError(ErrorSoftwareFJ):
+    """La reserva no se pudo crear o procesar."""
 
-    @property
-    def id_reserva(self):
-        return self.__id_reserva
 
-    @property
-    def estado(self):
-        return self.__estado
+class ServicioNoDisponibleError(ErrorSoftwareFJ):
+    """El servicio solicitado no está disponible."""
 
-    @property
-    def costo_total(self):
-        return self.__costo_total
 
-    def procesar_reserva(self):
-        """Procesa la reserva utilizando try/except/else y try/except/finally para máxima robustez."""
+class OperacionNoPermitidaError(ErrorSoftwareFJ):
+    """La acción no es válida para el estado actual de la reserva."""
+
+
+class CalculoInconsistenteError(ErrorSoftwareFJ):
+    """El cálculo del costo dio un resultado imposible."""
+
+
+# ----------------------------------------------------------------- RESERVA
+class Reserva(EntidadBase):
+    """Une cliente, servicio, duración y estado."""
+
+    PENDIENTE, CONFIRMADA, CANCELADA = "PENDIENTE", "CONFIRMADA", "CANCELADA"
+    _contador = itertools.count(1)                  # 1, 2, 3... para cada reserva
+
+    def __init__(self, cliente, servicio, horas, descuento=0.0):
+        super().__init__(f"R{next(Reserva._contador):03d}")  # Ej.: R001
+        if not isinstance(cliente, Cliente):        # Cliente debe ser un Cliente real
+            raise ReservaInvalidaError("La reserva necesita un cliente válido")
+        if not isinstance(servicio, Servicio):      # Servicio debe ser un Servicio real
+            raise ReservaInvalidaError("La reserva necesita un servicio válido")
+        if not isinstance(horas, (int, float)):     # Duración numérica
+            raise ReservaInvalidaError("La duración debe ser un número de horas")
+        servicio.validar_parametros(horas)          # Polimorfismo: cada servicio valida lo suyo
+        self.cliente = cliente
+        self.servicio = servicio
+        self.horas = horas
+        self.descuento = descuento
+        self.estado = Reserva.PENDIENTE             # Toda reserva nace pendiente
+        self.costo = None                           # Se calcula al confirmar
+
+    def confirmar(self):
+        """PENDIENTE -> CONFIRMADA (si hay disponibilidad y el cálculo es coherente)."""
+        if self.estado != Reserva.PENDIENTE:
+            raise OperacionNoPermitidaError(
+                f"{self.identificador} está {self.estado}: solo se confirma una PENDIENTE")
+        if not self.servicio.disponible:
+            raise ServicioNoDisponibleError(f"'{self.servicio.nombre}' no está disponible")
+        if not 0 <= self.descuento < 1:
+            raise CalculoInconsistenteError(f"Descuento imposible: {self.descuento}")
+        costo = self.servicio.calcular_costo(self.horas, self.descuento)
+        if costo <= 0:
+            raise CalculoInconsistenteError(f"Costo no válido: {costo}")
+        self.costo = costo
+        self.estado = Reserva.CONFIRMADA
+
+    def cancelar(self):
+        """Cancela una reserva que no esté ya cancelada."""
+        if self.estado == Reserva.CANCELADA:
+            raise OperacionNoPermitidaError(f"{self.identificador} ya estaba cancelada")
+        self.estado = Reserva.CANCELADA
+
+    def procesar(self):
+        """Confirma con try/except/else/finally y encadenamiento de errores."""
         try:
-            if not self.__cliente or not self.__servicio:
-                raise ValueError("La reserva debe tener un cliente y un servicio válidos asignados.")
-            
-            self.__costo_total = self.__servicio.calcular_costo(self.__cantidad_unidad, self.__tipo_parametro)
-            
-        except ValueError as ve:
-            self.__estado = "Fallida"
-            error_msg = f"Error de validación en Reserva #{self.__id_reserva}: {ve}"
-            logger.error(error_msg)
-            raise DatoInvalidoError(error_msg)
-            
-        except Exception as e:
-            self.__estado = "Error Crítico"
-            error_msg = f"Error inesperado procesando Reserva #{self.__id_reserva}: {e}"
-            logger.critical(error_msg)
-            raise ErrorSoftwareFJ(error_msg)
-            
+            self.confirmar()
+        except ErrorSoftwareFJ as error:
+            logger.error("Reserva %s no procesada: %s", self.identificador, error)
+            # "from error" conserva la causa original (encadenamiento)
+            raise ReservaInvalidaError(f"No se pudo procesar {self.identificador}") from error
         else:
-            self.__estado = "Confirmada"
-            logger.info(f"Reserva #{self.__id_reserva} confirmada con éxito para {self.__cliente.nombre}. Total: ${self.__costo_total}")
-            
+            logger.info("Reserva %s confirmada. Costo: %s", self.identificador, self.costo)
         finally:
-            print(f"[Transacción Finalizada] Intento de procesamiento para la Reserva #{self.__id_reserva} - Estado final: {self.__estado}")
+            logger.info("Fin del procesamiento de %s", self.identificador)
 
-    def cancelar_reserva(self):
-        """Cancela la reserva de manera segura controlando excepciones."""
+    def describir(self):
+        return (f"{self.identificador} | {self.cliente.nombre} | {self.servicio.nombre} | "
+                f"{self.horas} h | {self.estado} | costo: {self.costo}")
+
+    def __str__(self):
+        return self.describir()
+
+
+# ------------------------------------------------------------------ GESTOR
+class GestorReservas:
+    """Lista interna de reservas; ningún error detiene el programa."""
+
+    def __init__(self):
+        self.__reservas = []
+
+    def crear(self, cliente, servicio, horas, descuento=0.0):
+        """Crea y guarda una reserva. Devuelve la reserva o None si falló."""
         try:
-            if self.__estado == "Cancelada":
-                raise ErrorSoftwareFJ(f"La reserva #{self.__id_reserva} ya se encontraba cancelada.")
-            
-            self.__estado = "Cancelada"
-            logger.warning(f"Reserva #{self.__id_reserva} cancelada correctamente.")
-            print(f"La reserva #{self.__id_reserva} ha sido cancelada exitosamente.")
-            
-        except Exception as e:
-            logger.error(f"No se pudo cancelar la reserva #{self.__id_reserva}: {e}")
-            print(f"Error al cancelar la reserva: {e}")
+            reserva = Reserva(cliente, servicio, horas, descuento)
+        except ErrorSoftwareFJ as error:
+            logger.error("Creación de reserva fallida: %s", error)
+            print(f"[ERROR] {error}")
+            return None
+        self.__reservas.append(reserva)
+        logger.info("Reserva creada: %s", reserva.identificador)
+        print(f"[OK] Creada {reserva.identificador}")
+        return reserva
 
-    def obtener_reserva_detalles(self):
-        return (f"Reserva ID: {self.__id_reserva} | "
-                f"Cliente: {self.__cliente.nombre} | "
-                f"Servicio: {self.__servicio.nombre_servicio} | "
-                f"Estado: {self.__estado} | "
-                f"Costo Total: ${self.__costo_total:.2f}")
+    def procesar(self, reserva):
+        """Procesa una reserva. Devuelve True si quedó confirmada."""
+        try:
+            reserva.procesar()
+        except ErrorSoftwareFJ as error:
+            causa = error.__cause__                 # Error original encadenado
+            print(f"[ERROR] {error} -> causa: {causa}")
+            return False
+        print(f"[OK] {reserva}")
+        return True
+
+    def cancelar(self, reserva):
+        try:
+            reserva.cancelar()
+        except ErrorSoftwareFJ as error:
+            logger.error("Cancelación fallida: %s", error)
+            print(f"[ERROR] {error}")
+            return False
+        logger.info("Reserva %s cancelada", reserva.identificador)
+        print(f"[OK] Cancelada {reserva.identificador}")
+        return True
+
+    def listar(self):
+        return list(self.__reservas)
