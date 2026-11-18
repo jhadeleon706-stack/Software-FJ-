@@ -108,3 +108,4 @@ class AsesoriaEspecializada(Servicio):
 
     def describir_servicio(self):
         return f"[Asesoría] {self.nombre_servicio} - Área: {self.area_especialidad} - Tarifa hora: ${self.tarifa_base}"
+    
